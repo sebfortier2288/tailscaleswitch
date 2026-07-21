@@ -1,0 +1,6 @@
+# CODEOWNERS file for HCdashboard
+# For more info: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Global owners by default
+*       @sebfortier2288
+
