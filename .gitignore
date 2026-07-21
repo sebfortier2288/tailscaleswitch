@@ -1,15 +1,38 @@
+# Built artifacts
+bin/
+gen/
+out/
+build/
+app/build/
+
+# Gradle files
+.gradle/
+gradlew.bat
+
+# IntelliJ IDEA files
+.idea/
 *.iml
-.gradle
+*.iws
+*.ipr
+
+# Android Studio files
+/captures/
 /local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
+.externalNativeBuild/
+.cxx/
+*.jks
+*.p12
+*.keystore
+
+# Artifacts and logs
+.artifacts/
+*.log
+*.hprof
+
+# OS files
 .DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
-local.properties
+Thumbs.db
+
+# Project specific
+secrets.properties
+google-services.json
