@@ -5,16 +5,12 @@ plugins {
 
 android {
     namespace = "dev.sfpixel.tailscaleswitch"
-    compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
-    }
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "dev.sfpixel.tailscaleswitch"
         minSdk = 28
-        targetSdk = 36
+        targetSdk = 37
         versionCode = project.findProperty("versionCode")?.toString()?.toIntOrNull() ?: 1
         versionName = project.findProperty("versionName")?.toString() ?: "1.0.0"
 
