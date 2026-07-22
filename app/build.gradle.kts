@@ -5,16 +5,12 @@ plugins {
 
 android {
     namespace = "dev.sfpixel.tailscaleswitch"
-    compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
-    }
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "dev.sfpixel.tailscaleswitch"
         minSdk = 28
-        targetSdk = 36
+        targetSdk = 37
         versionCode = project.findProperty("versionCode")?.toString()?.toIntOrNull() ?: 1
         versionName = project.findProperty("versionName")?.toString() ?: "1.0.0"
 
@@ -53,7 +49,7 @@ dependencies {
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.lifecycle.service)
     implementation(libs.androidx.lifecycle.runtime.compose)
-    implementation("com.google.guava:guava:33.2.1-android")
+    implementation("com.google.guava:guava:33.6.0-android")
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
