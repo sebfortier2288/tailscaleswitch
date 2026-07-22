@@ -4,7 +4,6 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
@@ -32,11 +31,11 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.IntentCompat
 import androidx.core.content.PackageManagerCompat
 import androidx.core.content.UnusedAppRestrictionsConstants
+import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.sfpixel.tailscaleswitch.data.SsidRepository
-import dev.sfpixel.tailscaleswitch.service.WifiMonitoringService
 import dev.sfpixel.tailscaleswitch.ui.theme.TailscaleSwitchTheme
 import dev.sfpixel.tailscaleswitch.util.startMonitoringService
 import dev.sfpixel.tailscaleswitch.util.stopMonitoringService
@@ -64,10 +63,11 @@ fun MainScreen(repository: SsidRepository) {
     
     val trustedSsids by repository.trustedSsids.collectAsState(initial = emptySet())
     val isEnabled by repository.isServiceEnabled.collectAsState(initial = false)
+    val isAutoDisconnectEnabled by repository.isAutoDisconnectEnabled.collectAsState(initial = false)
     
-    var newSsid by remember { mutableStateOf("") }
-    var isIgnoringBatteryOptimizations by remember { mutableStateOf(false) }
-    var isBackgroundLocationGranted by remember { mutableStateOf(false) }
+    var newSsid by remember { mutableStateOf(value = "") }
+    var isIgnoringBatteryOptimizations by remember { mutableStateOf(value = false) }
+    var isBackgroundLocationGranted by remember { mutableStateOf(value = false) }
     var hibernationStatus by remember { mutableIntStateOf(UnusedAppRestrictionsConstants.DISABLED) }
 
     fun checkStatuses() {
@@ -81,13 +81,16 @@ fun MainScreen(repository: SsidRepository) {
         }
 
         val future = PackageManagerCompat.getUnusedAppRestrictionsStatus(context)
-        future.addListener({
-            try {
-                hibernationStatus = future.get()
-            } catch (e: Exception) {
-                // Ignore
-            }
-        }, ContextCompat.getMainExecutor(context))
+        future.addListener(
+            {
+                try {
+                    hibernationStatus = future.get()
+                } catch (_: Exception) {
+                    // Ignore
+                }
+            },
+            ContextCompat.getMainExecutor(context),
+        )
     }
 
     DisposableEffect(lifecycleOwner) {
@@ -104,7 +107,7 @@ fun MainScreen(repository: SsidRepository) {
 
     val permissionsToRequest = mutableListOf(
         Manifest.permission.ACCESS_FINE_LOCATION,
-        Manifest.permission.ACCESS_COARSE_LOCATION
+        Manifest.permission.ACCESS_COARSE_LOCATION,
     ).apply {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             add(Manifest.permission.POST_NOTIFICATIONS)
@@ -135,7 +138,7 @@ fun MainScreen(repository: SsidRepository) {
         topBar = {
             TopAppBar(title = { Text("Tailscale Switch") })
         },
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier.fillMaxSize(),
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -143,7 +146,6 @@ fun MainScreen(repository: SsidRepository) {
                 .padding(16.dp)
                 .fillMaxSize()
         ) {
-            // Service Toggle
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
@@ -165,6 +167,26 @@ fun MainScreen(repository: SsidRepository) {
                 )
             }
 
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Auto-disconnect", style = MaterialTheme.typography.titleMedium)
+                    Text("Turn off VPN after 1 min with no network", style = MaterialTheme.typography.bodySmall)
+                }
+                Switch(
+                    checked = isAutoDisconnectEnabled,
+                    onCheckedChange = { checked ->
+                        scope.launch {
+                            repository.setAutoDisconnectEnabled(checked)
+                        }
+                    }
+                )
+            }
+
             HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
 
             // System Optimizations
@@ -175,29 +197,28 @@ fun MainScreen(repository: SsidRepository) {
                 title = "Battery Optimization",
                 status = if (isIgnoringBatteryOptimizations) "Disabled (Good)" else "Enabled (Might kill daemon)",
                 isGood = isIgnoringBatteryOptimizations,
-                onClick = {
-                    val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                        data = Uri.parse("package:${context.packageName}")
-                    }
-                    context.startActivity(intent)
+            ) {
+                @Suppress("BatteryLife")
+                val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                    data = "package:${context.packageName}".toUri()
                 }
-            )
+                context.startActivity(intent)
+            }
 
             OptimizationItem(
                 title = "Background Location",
                 status = if (isBackgroundLocationGranted) "Always allowed (Good)" else "Only while in use (May fail in BG)",
                 isGood = isBackgroundLocationGranted,
-                onClick = {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                        // On Android 11+ we must show a rationale first, but for simplicity we'll direct to settings
-                        // or just try to request it if we have foreground first.
-                        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                            data = Uri.parse("package:${context.packageName}")
-                        }
-                        context.startActivity(intent)
+            ) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    // On Android 11+ we must show a rationale first, but for simplicity we'll direct to settings
+                    // or just try to request it if we have foreground first.
+                    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                        data = "package:${context.packageName}".toUri()
                     }
+                    context.startActivity(intent)
                 }
-            )
+            }
 
             OptimizationItem(
                 title = "Auto-Reset Permissions",
@@ -206,12 +227,12 @@ fun MainScreen(repository: SsidRepository) {
                     UnusedAppRestrictionsConstants.FEATURE_NOT_AVAILABLE -> "Not applicable"
                     else -> "Enabled (Might revoke permissions)"
                 },
-                isGood = hibernationStatus == UnusedAppRestrictionsConstants.DISABLED || hibernationStatus == UnusedAppRestrictionsConstants.FEATURE_NOT_AVAILABLE,
-                onClick = {
-                    val intent = IntentCompat.createManageUnusedAppRestrictionsIntent(context, context.packageName)
-                    context.startActivity(intent)
-                }
-            )
+                isGood = (hibernationStatus == UnusedAppRestrictionsConstants.DISABLED) ||
+                        (hibernationStatus == UnusedAppRestrictionsConstants.FEATURE_NOT_AVAILABLE),
+            ) {
+                val intent = IntentCompat.createManageUnusedAppRestrictionsIntent(context, context.packageName)
+                context.startActivity(intent)
+            }
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
 
@@ -220,17 +241,19 @@ fun MainScreen(repository: SsidRepository) {
                 OutlinedTextField(
                     value = newSsid,
                     onValueChange = { newSsid = it },
-                    label = { Text("Nouveau SSID") },
-                    modifier = Modifier.weight(1f)
+                    label = { Text("Wifi SSID") },
+                    modifier = Modifier.weight(1f),
                 )
-                IconButton(onClick = {
-                    if (newSsid.isNotBlank()) {
-                        scope.launch {
-                            repository.addSsid(newSsid)
-                            newSsid = ""
+                IconButton(
+                    onClick = {
+                        if (newSsid.isNotBlank()) {
+                            scope.launch {
+                                repository.addSsid(newSsid)
+                                newSsid = ""
+                            }
                         }
-                    }
-                }) {
+                    },
+                ) {
                     Icon(Icons.Default.Add, contentDescription = "Ajouter")
                 }
             }
@@ -243,12 +266,14 @@ fun MainScreen(repository: SsidRepository) {
                 items(trustedSsids.toList()) { ssid ->
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                     ) {
                         Text(ssid, modifier = Modifier.weight(1f))
-                        IconButton(onClick = {
-                            scope.launch { repository.removeSsid(ssid) }
-                        }) {
+                        IconButton(
+                            onClick = {
+                                scope.launch { repository.removeSsid(ssid) }
+                            },
+                        ) {
                             Icon(Icons.Default.Delete, contentDescription = "Supprimer")
                         }
                     }
@@ -264,8 +289,12 @@ fun OptimizationItem(title: String, status: String, isGood: Boolean, onClick: ()
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         onClick = onClick,
         colors = CardDefaults.cardColors(
-            containerColor = if (isGood) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.errorContainer
-        )
+            containerColor = if (isGood) {
+                MaterialTheme.colorScheme.surfaceVariant
+            } else {
+                MaterialTheme.colorScheme.errorContainer
+            },
+        ),
     ) {
         Row(
             modifier = Modifier.padding(12.dp),

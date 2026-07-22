@@ -20,29 +20,45 @@ import dev.sfpixel.tailscaleswitch.MainActivity
 import dev.sfpixel.tailscaleswitch.data.SsidRepository
 import dev.sfpixel.tailscaleswitch.util.SsidUtils
 import dev.sfpixel.tailscaleswitch.util.TailscaleController
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.minutes
 
 class WifiMonitoringService : LifecycleService() {
 
     private lateinit var connectivityManager: ConnectivityManager
     private lateinit var ssidRepository: SsidRepository
     private var currentSsid: String? = null
+    private val activeNetworks = mutableSetOf<Network>()
+    private var disconnectJob: Job? = null
 
     companion object {
         private const val TAG = "WifiMonitoringService"
         private const val CHANNEL_ID = "wifi_monitoring_channel"
         private const val NOTIFICATION_ID = 1
+        private val DISCONNECT_DELAY = 1.minutes
     }
 
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) {
             super.onAvailable(network)
+            synchronized(activeNetworks) {
+                activeNetworks.add(network)
+                cancelDisconnectTimer()
+            }
             checkWifiAndToggleTailscale()
         }
 
         override fun onLost(network: Network) {
             super.onLost(network)
+            synchronized(activeNetworks) {
+                activeNetworks.remove(network)
+                if (activeNetworks.isEmpty()) {
+                    startDisconnectTimer()
+                }
+            }
             checkWifiAndToggleTailscale()
         }
 
@@ -80,9 +96,31 @@ class WifiMonitoringService : LifecycleService() {
 
     private fun registerNetworkCallback() {
         val request = NetworkRequest.Builder()
-            .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+            .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
             .build()
         connectivityManager.registerNetworkCallback(request, networkCallback)
+    }
+
+    private fun startDisconnectTimer() {
+        lifecycleScope.launch {
+            if (ssidRepository.isAutoDisconnectEnabled.first()) {
+                Log.d(TAG, "No network available. Starting 1 minute timer before disconnecting VPN.")
+                disconnectJob?.cancel()
+                disconnectJob = lifecycleScope.launch {
+                    delay(DISCONNECT_DELAY)
+                    Log.d(TAG, "Network still unavailable after 1 minute. Disconnecting Tailscale.")
+                    TailscaleController.disconnect(this@WifiMonitoringService)
+                }
+            }
+        }
+    }
+
+    private fun cancelDisconnectTimer() {
+        if (disconnectJob != null) {
+            Log.d(TAG, "Network restored. Canceling disconnect timer.")
+            disconnectJob?.cancel()
+            disconnectJob = null
+        }
     }
 
     private fun checkWifiAndToggleTailscale() {
