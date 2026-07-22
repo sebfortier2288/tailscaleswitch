@@ -48,8 +48,16 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      - name: Decode Keystore
+        run: echo "${{ secrets.KEYSTORE }}" | base64 --decode > release.jks
+
       - name: Build Debug APK
         run: ./gradlew assembleDebug -PversionName=${{ steps.gitversion.outputs.majorMinorPatch }} -PversionCode=${{ github.run_number }}
+        env:
+          KEYSTORE_PATH: ../release.jks
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
       - name: Generate Changelog
         id: changelog
