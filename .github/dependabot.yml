@@ -4,6 +4,10 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    groups:
+      gradle-updates:
+        patterns:
+          - "*"
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
@@ -12,6 +16,7 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
-    ignore:
-      - dependency-name: "*"
-        update-types: ["version-update:semver-major"]
+    groups:
+      actions-updates:
+        patterns:
+          - "*"
