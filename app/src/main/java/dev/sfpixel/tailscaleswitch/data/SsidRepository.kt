@@ -14,6 +14,7 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(na
 class SsidRepository(private val context: Context) {
     private val trustedSsidsKey = stringSetPreferencesKey("trusted_ssids")
     private val serviceEnabledKey = androidx.datastore.preferences.core.booleanPreferencesKey("service_enabled")
+    private val autoDisconnectKey = androidx.datastore.preferences.core.booleanPreferencesKey("auto_disconnect_enabled")
 
     val trustedSsids: Flow<Set<String>> = context.dataStore.data
         .map { preferences ->
@@ -23,6 +24,11 @@ class SsidRepository(private val context: Context) {
     val isServiceEnabled: Flow<Boolean> = context.dataStore.data
         .map { preferences ->
             preferences[serviceEnabledKey] ?: false
+        }
+
+    val isAutoDisconnectEnabled: Flow<Boolean> = context.dataStore.data
+        .map { preferences ->
+            preferences[autoDisconnectKey] ?: false
         }
 
     suspend fun addSsid(ssid: String) {
@@ -42,6 +48,12 @@ class SsidRepository(private val context: Context) {
     suspend fun setServiceEnabled(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[serviceEnabledKey] = enabled
+        }
+    }
+
+    suspend fun setAutoDisconnectEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[autoDisconnectKey] = enabled
         }
     }
 }
