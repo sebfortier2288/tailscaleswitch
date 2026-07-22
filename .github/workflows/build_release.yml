@@ -49,12 +49,16 @@ jobs:
         run: chmod +x gradlew
 
       - name: Decode Keystore
-        run: echo "${{ secrets.KEYSTORE }}" | base64 --decode > release.jks
+        id: decode_keystore
+        uses: timheuer/base64-to-file@v1
+        with:
+          fileName: 'release.jks'
+          encodedString: ${{ secrets.KEYSTORE }}
 
       - name: Build Debug APK
         run: ./gradlew assembleDebug -PversionName=${{ steps.gitversion.outputs.majorMinorPatch }} -PversionCode=${{ github.run_number }}
         env:
-          KEYSTORE_PATH: ../release.jks
+          KEYSTORE_PATH: ${{ steps.decode_keystore.outputs.filePath }}
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
