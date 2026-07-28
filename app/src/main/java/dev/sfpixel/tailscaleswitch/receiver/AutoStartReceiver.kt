@@ -10,9 +10,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
-class BootReceiver : BroadcastReceiver() {
+class AutoStartReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
+        if ((intent.action == Intent.ACTION_BOOT_COMPLETED) || (intent.action == Intent.ACTION_MY_PACKAGE_REPLACED)) {
             val repository = SsidRepository(context)
             CoroutineScope(Dispatchers.IO).launch {
                 if (repository.isServiceEnabled.first()) {
