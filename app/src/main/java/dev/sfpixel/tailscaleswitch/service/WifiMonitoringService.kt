@@ -31,6 +31,7 @@ class WifiMonitoringService : LifecycleService() {
     private lateinit var connectivityManager: ConnectivityManager
     private lateinit var ssidRepository: SsidRepository
     private var currentSsid: String? = null
+    private var isOnMobileData: Boolean = false
     private val activeNetworks = mutableSetOf<Network>()
     private var disconnectJob: Job? = null
 
@@ -130,16 +131,23 @@ class WifiMonitoringService : LifecycleService() {
             val wifiInfo: WifiInfo? = wifiManager.connectionInfo
 
             val ssid = SsidUtils.cleanSsid(wifiInfo?.ssid)
-            if (ssid == null) {
-                // Not connected to a specific Wi-Fi
-                handleDisconnected()
+            val hasInternet = synchronized(activeNetworks) { activeNetworks.isNotEmpty() }
+
+            if (ssid != null) {
+                isOnMobileData = false
+                handleConnectedWifi(ssid)
+            } else if (hasInternet) {
+                currentSsid = null
+                handleConnectedMobileData()
             } else {
-                handleConnected(ssid)
+                currentSsid = null
+                isOnMobileData = false
+                Log.d(TAG, "No network connectivity.")
             }
         }
     }
 
-    private suspend fun handleConnected(ssid: String) {
+    private suspend fun handleConnectedWifi(ssid: String) {
         if (currentSsid == ssid) return
         currentSsid = ssid
         Log.d(TAG, "Connected to Wi-Fi: $ssid")
@@ -154,10 +162,10 @@ class WifiMonitoringService : LifecycleService() {
         }
     }
 
-    private fun handleDisconnected() {
-        if (currentSsid == null) return
-        currentSsid = null
-        Log.d(TAG, "Disconnected from Wi-Fi, connecting Tailscale")
+    private fun handleConnectedMobileData() {
+        if (isOnMobileData) return
+        isOnMobileData = true
+        Log.d(TAG, "Connected to non-Wi-Fi network (mobile data?), connecting Tailscale")
         TailscaleController.connect(this)
     }
 
