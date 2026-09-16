@@ -4,6 +4,8 @@ Tailscale Switch is a small Android application that automatically manages your 
 
 The goal is to ensure your connection is always secure on unknown or mobile networks, while automatically disabling the VPN when you are on trusted Wi-Fi networks.
 
+> **Disclaimer:** This project is an independent tool. It is not affiliated, associated, authorized, endorsed by, or in any way officially connected with [Tailscale Inc.](https://tailscale.com). "Tailscale" is a registered trademark of Tailscale Inc.
+
 ## Features
 
 - **Automatic Activation**: Connects Tailscale on mobile data and unlisted Wi-Fi networks.
