@@ -17,6 +17,8 @@ import androidx.core.app.NotificationCompat
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
 import dev.sfpixel.tailscaleswitch.MainActivity
+import dev.sfpixel.tailscaleswitch.data.ActionType
+import dev.sfpixel.tailscaleswitch.data.HistoryRepository
 import dev.sfpixel.tailscaleswitch.data.SsidRepository
 import dev.sfpixel.tailscaleswitch.util.SsidUtils
 import dev.sfpixel.tailscaleswitch.util.TailscaleController
@@ -30,6 +32,7 @@ class WifiMonitoringService : LifecycleService() {
 
     private lateinit var connectivityManager: ConnectivityManager
     private lateinit var ssidRepository: SsidRepository
+    private lateinit var historyRepository: HistoryRepository
     private var currentSsid: String? = null
     private var isOnMobileData: Boolean = false
     private val activeNetworks = mutableSetOf<Network>()
@@ -75,6 +78,12 @@ class WifiMonitoringService : LifecycleService() {
         super.onCreate()
         connectivityManager = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
         ssidRepository = SsidRepository(this)
+        historyRepository = HistoryRepository(this)
+        
+        lifecycleScope.launch {
+            historyRepository.logAction(ActionType.SERVICE, "Service de surveillance Wi-Fi démarré")
+        }
+
         createNotificationChannel()
         val notification = createNotification()
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
@@ -106,11 +115,21 @@ class WifiMonitoringService : LifecycleService() {
         lifecycleScope.launch {
             if (ssidRepository.isAutoDisconnectEnabled.first()) {
                 Log.d(TAG, "No network available. Starting 1 minute timer before disconnecting VPN.")
+                historyRepository.logAction(
+                    ActionType.TIMER,
+                    "Minuteur de déconnexion démarré",
+                    "Aucun réseau disponible. Déconnexion prévue dans 1 min."
+                )
                 disconnectJob?.cancel()
                 disconnectJob = lifecycleScope.launch {
                     delay(DISCONNECT_DELAY)
                     Log.d(TAG, "Network still unavailable after 1 minute. Disconnecting Tailscale.")
-                    TailscaleController.disconnect(this@WifiMonitoringService)
+                    historyRepository.logAction(
+                        ActionType.TIMER,
+                        "Minuteur expiré (1 min sans réseau)",
+                        "Envoi du signal de déconnexion VPN"
+                    )
+                    TailscaleController.disconnect(this@WifiMonitoringService, reason = "Réseau indisponible depuis 1 min")
                 }
             }
         }
@@ -119,6 +138,13 @@ class WifiMonitoringService : LifecycleService() {
     private fun cancelDisconnectTimer() {
         if (disconnectJob != null) {
             Log.d(TAG, "Network restored. Canceling disconnect timer.")
+            lifecycleScope.launch {
+                historyRepository.logAction(
+                    ActionType.TIMER,
+                    "Minuteur de déconnexion annulé",
+                    "Réseau restauré avant l'expiration du minuteur"
+                )
+            }
             disconnectJob?.cancel()
             disconnectJob = null
         }
@@ -155,10 +181,20 @@ class WifiMonitoringService : LifecycleService() {
         val trustedSsids = ssidRepository.trustedSsids.first()
         if (trustedSsids.contains(ssid)) {
             Log.d(TAG, "Trusted SSID detected, disconnecting Tailscale")
-            TailscaleController.disconnect(this)
+            historyRepository.logAction(
+                ActionType.NETWORK_CHANGE,
+                "Connecté au Wi-Fi approuvé : $ssid",
+                "Demande de déconnexion de Tailscale"
+            )
+            TailscaleController.disconnect(this, reason = "Wi-Fi approuvé connecté : $ssid")
         } else {
             Log.d(TAG, "Untrusted SSID detected, connecting Tailscale")
-            TailscaleController.connect(this)
+            historyRepository.logAction(
+                ActionType.NETWORK_CHANGE,
+                "Connecté au Wi-Fi non approuvé : $ssid",
+                "Demande de connexion à Tailscale"
+            )
+            TailscaleController.connect(this, reason = "Wi-Fi non approuvé connecté : $ssid")
         }
     }
 
@@ -166,7 +202,14 @@ class WifiMonitoringService : LifecycleService() {
         if (isOnMobileData) return
         isOnMobileData = true
         Log.d(TAG, "Connected to non-Wi-Fi network (mobile data?), connecting Tailscale")
-        TailscaleController.connect(this)
+        lifecycleScope.launch {
+            historyRepository.logAction(
+                ActionType.NETWORK_CHANGE,
+                "Connecté au réseau mobile / non-Wi-Fi",
+                "Demande de connexion à Tailscale"
+            )
+        }
+        TailscaleController.connect(this, reason = "Réseau mobile / non-Wi-Fi connecté")
     }
 
     private fun createNotificationChannel() {
@@ -196,6 +239,10 @@ class WifiMonitoringService : LifecycleService() {
 
     override fun onDestroy() {
         super.onDestroy()
+        lifecycleScope.launch {
+            historyRepository.logAction(ActionType.SERVICE, "Service de surveillance Wi-Fi arrêté")
+        }
         connectivityManager.unregisterNetworkCallback(networkCallback)
     }
 }
+
