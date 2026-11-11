@@ -24,11 +24,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.PowerSettingsNew
-import androidx.compose.material.icons.filled.Timer
-import androidx.compose.material.icons.filled.Wifi
+import dev.sfpixel.tailscaleswitch.ui.icon.AppIcons
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -70,13 +67,12 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(repository: SsidRepository, historyRepository: HistoryRepository) {
     val scope = rememberCoroutineScope()
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    var showHistory by remember { mutableStateOf(false) }
+    var showHistory by remember { mutableStateOf(value = false) }
 
     BackHandler(enabled = showHistory) {
         showHistory = false
@@ -102,7 +98,7 @@ fun MainScreen(repository: SsidRepository, historyRepository: HistoryRepository)
                         }
                     } else {
                         IconButton(onClick = { showHistory = true }) {
-                            Icon(Icons.Default.History, contentDescription = "Historique")
+                            Icon(AppIcons.History, contentDescription = "Historique")
                         }
                     }
                 }
@@ -132,7 +128,7 @@ fun MainScreen(repository: SsidRepository, historyRepository: HistoryRepository)
 fun MainContent(
     repository: SsidRepository,
     historyRepository: HistoryRepository,
-    lifecycleOwner: androidx.lifecycle.LifecycleOwner
+    lifecycleOwner: androidx.lifecycle.LifecycleOwner,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -193,7 +189,7 @@ fun MainContent(
     val launcher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
-        val allGranted = permissions.entries.all { it.value }
+        val allGranted = permissions.values.all { it }
         if (allGranted) {
             Toast.makeText(context, "Permissions accordées", Toast.LENGTH_SHORT).show()
         } else {
@@ -374,7 +370,7 @@ fun HistoryView(historyRepository: HistoryRepository) {
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Icon(
-                    imageVector = Icons.Default.History,
+                    imageVector = AppIcons.History,
                     contentDescription = null,
                     modifier = Modifier.size(64.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
@@ -404,9 +400,9 @@ fun HistoryView(historyRepository: HistoryRepository) {
 fun HistoryItemCard(log: ActionLogEntry, dateFormat: SimpleDateFormat, dayFormat: SimpleDateFormat) {
     val (icon: ImageVector, color) = when (log.type) {
         ActionType.CONNECT -> Pair(Icons.Default.CheckCircle, MaterialTheme.colorScheme.primary)
-        ActionType.DISCONNECT -> Pair(Icons.Default.PowerSettingsNew, MaterialTheme.colorScheme.error)
-        ActionType.NETWORK_CHANGE -> Pair(Icons.Default.Wifi, MaterialTheme.colorScheme.secondary)
-        ActionType.TIMER -> Pair(Icons.Default.Timer, MaterialTheme.colorScheme.tertiary)
+        ActionType.DISCONNECT -> Pair(AppIcons.PowerSettingsNew, MaterialTheme.colorScheme.error)
+        ActionType.NETWORK_CHANGE -> Pair(AppIcons.Wifi, MaterialTheme.colorScheme.secondary)
+        ActionType.TIMER -> Pair(AppIcons.Timer, MaterialTheme.colorScheme.tertiary)
         ActionType.SERVICE -> Pair(Icons.Default.Info, MaterialTheme.colorScheme.outline)
     }
 
@@ -414,8 +410,8 @@ fun HistoryItemCard(log: ActionLogEntry, dateFormat: SimpleDateFormat, dayFormat
         val now = System.currentTimeMillis()
         val calNow = Calendar.getInstance().apply { timeInMillis = now }
         val calLog = Calendar.getInstance().apply { timeInMillis = log.timestamp }
-        val isToday = calNow.get(Calendar.YEAR) == calLog.get(Calendar.YEAR) &&
-                calNow.get(Calendar.DAY_OF_YEAR) == calLog.get(Calendar.DAY_OF_YEAR)
+        val isToday = (calNow[Calendar.YEAR] == calLog[Calendar.YEAR]) &&
+                (calNow[Calendar.DAY_OF_YEAR] == calLog[Calendar.DAY_OF_YEAR])
         if (isToday) dateFormat.format(log.timestamp) else dayFormat.format(log.timestamp)
     }
 

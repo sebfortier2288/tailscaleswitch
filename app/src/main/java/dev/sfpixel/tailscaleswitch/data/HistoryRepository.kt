@@ -27,7 +27,7 @@ data class ActionLogEntry(
     val timestamp: Long = System.currentTimeMillis(),
     val type: ActionType,
     val message: String,
-    val details: String? = null
+    val details: String? = null,
 ) {
     fun toJson(): JSONObject {
         return JSONObject().apply {
@@ -35,9 +35,7 @@ data class ActionLogEntry(
             put("timestamp", timestamp)
             put("type", type.name)
             put("message", message)
-            if (details != null) {
-                put("details", details)
-            }
+            details?.let { put("details", it) }
         }
     }
 
@@ -74,7 +72,7 @@ class HistoryRepository(private val context: Context) {
         val newEntry = ActionLogEntry(
             type = type,
             message = message,
-            details = details
+            details = details,
         )
         context.historyDataStore.edit { preferences ->
             val currentJsonString = preferences[logsKey] ?: "[]"
