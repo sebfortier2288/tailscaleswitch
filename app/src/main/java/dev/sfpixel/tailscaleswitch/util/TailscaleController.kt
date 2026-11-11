@@ -4,6 +4,11 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import dev.sfpixel.tailscaleswitch.data.ActionType
+import dev.sfpixel.tailscaleswitch.data.HistoryRepository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 object TailscaleController {
     private const val TAG = "TailscaleController"
@@ -12,20 +17,28 @@ object TailscaleController {
     private const val ACTION_CONNECT = "com.tailscale.ipn.CONNECT_VPN"
     private const val ACTION_DISCONNECT = "com.tailscale.ipn.DISCONNECT_VPN"
 
-    fun connect(context: Context) {
-        sendIntent(context, ACTION_CONNECT)
+    fun connect(context: Context, reason: String? = null) {
+        sendIntent(context, ACTION_CONNECT, reason)
     }
 
-    fun disconnect(context: Context) {
-        sendIntent(context, ACTION_DISCONNECT)
+    fun disconnect(context: Context, reason: String? = null) {
+        sendIntent(context, ACTION_DISCONNECT, reason)
     }
 
-    private fun sendIntent(context: Context, action: String) {
-        Log.d(TAG, "Sending intent: $action")
+    private fun sendIntent(context: Context, action: String, reason: String?) {
+        Log.d(TAG, "Sending intent: $action (Reason: $reason)")
         val intent = Intent(action).apply {
             component = ComponentName(TAILSCALE_PACKAGE, TAILSCALE_RECEIVER)
             setPackage(TAILSCALE_PACKAGE)
         }
         context.sendBroadcast(intent)
+
+        val historyRepository = HistoryRepository(context)
+        val actionType = if (action == ACTION_CONNECT) ActionType.CONNECT else ActionType.DISCONNECT
+        val message = if (action == ACTION_CONNECT) "Signal de connexion envoyé à Tailscale" else "Signal de déconnexion envoyé à Tailscale"
+        CoroutineScope(Dispatchers.IO).launch {
+            historyRepository.logAction(actionType, message, reason)
+        }
     }
 }
+
