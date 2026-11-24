@@ -27,13 +27,13 @@ jobs:
         run: git config --global --add safe.directory ${{ github.workspace }}
         
       - name: Install GitVersion
-        uses: gittools/actions/gitversion/setup@v4
+        uses: gittools/actions/gitversion/setup@v5
         with:
           versionSpec: '6.x'
 
       - name: Determine Version
         id: gitversion
-        uses: gittools/actions/gitversion/execute@v4
+        uses: gittools/actions/gitversion/execute@v5
         env:
           GITVERSION_MODE: Mainline
           GITVERSION_TAGPREFIX: '[vV]'
